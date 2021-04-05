@@ -1,0 +1,337 @@
+import React, { Component } from 'react';
+import {
+    Platform,
+    StyleSheet,
+    Image,
+    Text,
+    View,
+    TouchableOpacity,
+    ScrollView,
+    Dimensions,
+    Button
+}
+    from 'react-native';
+import { ImageCrop } from 'react-native-image-cropper'
+import { Header } from 'react-native-elements';
+import Tflite from 'tflite-react-native';
+import ImagePicker from 'react-native-image-picker';
+import {styles} from './style';
+
+import Name from './Data/Database'
+import FamilyDetail from './Data/familydetail';
+import images from './images/src/image'
+
+import cameraicon from './cameraicon.png';
+import galleryicon from './galleryicon.png';
+// import { openDrawer } from 'react-navigation-drawer/lib/typescript/src/routers/DrawerActions';
+
+let tflite = new Tflite();
+
+const height = Dimensions.get('window').height;
+const width = Dimensions.get('window').width;
+const blue = "#ffffff";
+// const mobile = "Pick an image";
+var searchTerm = '';
+
+var birdsrecognize = ['alpine swift'];
+var birdsrecognizepercent = ['0']
+console.disableYellowBox = true;
+
+
+
+export default class HomeScreen extends Component {
+
+    constructor(props) {
+        super(props);
+        this.state = {
+            model: null,
+            source: null,
+            imageHeight: height,
+            zoom:0,
+            imageWidth: width,
+            recognitions: [],
+            search: false,
+            article: {
+                title: 'Searching...',
+                content: 'Please wait',
+            },
+            term: props.searchTerm,
+        };
+        this.onSelectModel('model');
+    }
+
+    onSelectModel(model) {
+        this.setState({ model });
+        var modelFile = 'models/retrained_graph886at20k.lite';
+        var labelsFile = 'models/retrained_labels886.txt';
+        tflite.loadModel({
+            model: modelFile,
+            labels: labelsFile,
+        },
+            (err, res) => {
+                if (err)
+                    console.log(err);
+                else
+                    console.log(res);
+            });
+
+    }
+
+
+
+    onSelectCamera() {
+        const options = {
+            title: 'Select Avatar',
+            customButtons: [{ name: 'fb', title: 'Choose Photo from Facebook' }],
+            storageOptions: {
+                skipBackup: true,
+                path: 'images',
+            },
+        };
+        ImagePicker.launchCamera(options, (response) => {
+            if (response.didCancel) {
+                console.log('User cancelled image picker');
+            } else if (response.error) {
+                console.log('ImagePicker Error: ', response.error);
+            } else if (response.customButton) {
+                console.log('User tapped custom button: ', response.customButton);
+            } else {
+                var path = Platform.OS === 'ios' ? response.uri : 'file://' + response.path;
+                var w = response.width;
+                var h = response.height;
+                this.setState({
+                    source: { uri: path },
+                    imageHeight: h * width / w,
+                    imageWidth: width
+                });
+
+                tflite.runModelOnImage({
+                    path,
+                    imageMean: 128.0,
+                    imageStd: 128.0,
+                    numResults: 3,
+                    threshold: 0.05
+                },
+                    (err, res) => {
+                        if (err)
+                            console.log(err);
+                        else
+                            this.setState({ recognitions: res });
+                    });
+
+            }
+        });
+    }
+
+    onSelectGallery() {
+        const options = {
+            title: 'Select Avatar',
+            customButtons: [{ name: 'fb', title: 'Choose Photo from Facebook' }],
+            storageOptions: {
+                skipBackup: true,
+                path: 'images',
+            },
+        };
+        ImagePicker.launchImageLibrary(options, (response) => {
+            if (response.didCancel) {
+                console.log('User cancelled image picker');
+            } else if (response.error) {
+                console.log('ImagePicker Error: ', response.error);
+            } else if (response.customButton) {
+                console.log('User tapped custom button: ', response.customButton);
+            } else {
+                var path = Platform.OS === 'ios' ? response.uri : 'file://' + response.path;
+                var w = response.width;
+                var h = response.height;
+                this.setState({
+                    source: { uri: path },
+                    imageHeight: 350,
+                    imageWidth: 350
+                });
+
+                tflite.runModelOnImage({
+                    path,
+                    imageMean: 128.0,
+                    imageStd: 128.0,
+                    numResults: 3,
+                    threshold: 0.05
+                },
+                    (err, res) => {
+                        if (err)
+                            console.log(err);
+                        else
+                            this.setState({ recognitions: res });
+                    });
+
+            }
+        });
+    }
+
+    renderBoxes() {
+        const { model, recognitions, imageHeight, imageWidth } = this.state;
+        var i = 0;
+        return recognitions.map((res, id) => {
+            birdsrecognize[i] = res["label"];
+            birdsrecognizepercent[i] = (res["confidence"] * 100).toFixed(0)
+            i++;
+        });
+
+
+
+    }
+
+
+    render() {
+        var { model, source, imageHeight, imageWidth } = this.state;
+
+        var resultScreen = () => {
+            return (
+                <View >
+
+                    <View style={[styles.galleryinbutton]}>
+                        <TouchableOpacity
+                            onPress={this.onSelectCamera.bind(this)}
+                            style={[styles.gallertbutton, styles.styleborder]}
+                        >
+                            <Image source={cameraicon} style={styles.icon} />
+                            <Text style={styles.textcgs}>Scan a Bird</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.galleryinbutton}>
+                        <TouchableOpacity
+                            onPress={this.onSelectGallery.bind(this)}
+                            style={[styles.gallertbutton, styles.styleborder]}
+                        >
+                            <Image source={galleryicon} style={styles.icon} />
+
+                            <Text style={styles.textcgs}> Pick from Gallery</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.galleryinbutton}>
+                        <TouchableOpacity
+                            onPress={() => this.props.navigation.navigate('Explore')}
+                            style={[styles.gallertbutton, styles.centerAlign, styles.styleborder]}
+                        >
+                            {/* <Image source={galleryicon} style={styles.icon} /> */}
+
+                            <Text style={styles.textcgs}>Explore Birds</Text>
+                        </TouchableOpacity>
+
+                    </View>
+                </View>
+            );
+        }
+
+
+        return (
+            <View style={styles.container}>
+                {source ?
+                    <View style={styles.centerAlign}>
+
+                        <View style={{ height: height * 0.04, width: 300 }}>
+
+                        </View>
+                        <View style={[styles.centerAlign, styles.imagecontainer]}>
+
+                            <ImageCrop
+                                ref={'cropper'}
+                                source={source}
+                                zoom={this.state.zoom}
+                                maxZoom={80}
+                                minZoom={20}
+                                panToMove={true}
+                                pinchToZoom={true}
+                                style={{
+                                    height: height * 0.39,
+                                    width: imageWidth
+                                }}
+                                resizeMode="contain"
+                            />
+                        </View>
+                        {this.renderBoxes()}
+                        <View style={[styles.resultstyle, styles.centerAlign]}>
+                            <Text style={styles.textresult}>
+                                {Name[birdsrecognize[0]]["name"]}
+                            </Text>
+                            <Text style={styles.textresult}>
+                                {birdsrecognizepercent[0] + "%"}
+                            </Text>
+                        </View>
+
+                        <View style={[styles.buttonstyles, styles.centerAlign]}>
+                            <View style={[styles.button, { backgroundColor: 'grey', borderRadius: 7, margin: height * 0.005 }]}>
+                                <TouchableOpacity
+                                    style={[styles.button, styles.styleborder2, styles.centerAlign]}
+                                    onPress={() =>
+                                        this.props.navigation.navigate('Details', {
+                                            searchTerm: birdsrecognize[0],
+                                        })
+                                    }
+                                >
+                                    <Text style={[styles.textresult, { color: '#fff' }]}>Details</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={[styles.button, { backgroundColor: 'grey', borderRadius: 7, margin: height * 0.005 }]}>
+                                <TouchableOpacity
+                                    style={[styles.button, styles.styleborder2, styles.centerAlign]}
+                                    onPress={() => { this.setState({ source: null }) }}>
+                                    <Text style={[styles.textresult, { color: '#fff' }]}>Back</Text>
+                                </TouchableOpacity>
+                            </View>
+
+
+                        </View>
+                        <View style={{ marginTop: height * 0.004, width: width * 0.95, flexDirection: 'row' }}>
+                            <Text style={{ textAlign: 'left' }}>
+                                Other Birds of family:
+                            </Text>
+                            <Text style={{ fontWeight: 'bold' }}>
+                                {" " + Name[birdsrecognize[0]]["family"]}
+                            </Text>
+                        </View>
+                        <ScrollView horizontal style={{ flexDirection: 'row', width: width * 0.96 }}>
+                            {FamilyDetail[Name[birdsrecognize[0]]["family"]].map((item, key) =>
+                                <TouchableOpacity
+                                    onPress={() =>
+                                        this.props.navigation.navigate('Details', {
+                                            searchTerm: item,
+                                        })
+                                    }
+                                >
+                                    <View key={key} style={[styles.recommendstyle]}>
+                                        <Image
+                                            source={images[item]}
+                                            style={{
+                                                height: height * 0.129,
+                                                width: height * 0.126,
+                                            }}
+                                            resizeMode='contain'
+                                        />
+
+                                        {/* <Text>{Name[item]["name"]}</Text> */}
+
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+
+                        </ScrollView>
+                    </View>
+
+                    :
+
+                    <View>
+                        {resultScreen()}
+                    </View>
+
+                }
+            </View>
+        );
+    }
+}
+
+
+
+
+
+co
